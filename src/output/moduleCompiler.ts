@@ -8,13 +8,24 @@ import {
   walk,
   walkIdentifiers,
 } from 'vue/compiler-sfc'
-import type { ExportSpecifier, Identifier, Node } from '@babel/types'
+import container from './container'
 
-export function compileModulesForPreview(store: Store, isSSR = false) {
+import type { ExportSpecifier, Identifier, Node } from '@babel/types'
+import { compileCode } from '../transform'
+
+export async function compileModulesForPreview(store: Store, isSSR = false) {
   const seen = new Set<File>()
   const processed: string[] = []
   processFile(store, store.files[store.mainFile], processed, seen, isSSR)
-
+  const { errors, file } = await compileCode(
+    container(store.mainFile),
+    'Container.js',
+    false,
+  )
+  if(errors && errors.length) {
+    throw errors[0]
+  }
+  if (file) processFile(store, file, processed, seen, false)
   if (!isSSR) {
     // also add css files that are not imported
     for (const filename in store.files) {

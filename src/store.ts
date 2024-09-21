@@ -28,9 +28,16 @@ export const tsconfigFile = 'tsconfig.json'
 
 export function useStore(
   {
-    files = ref(Object.create(null)),
+    files = ref({
+      'Setup.js': new File('Setup.js', ''),
+      'Script.js': new File('Script.js', ''),
+      'Template.js': new File('Template.js', ''),
+      'Style.css': new File('Style.css', ''),
+      'Main.vue': new File('Main.vue', '', true),
+    }),
+    
     activeFilename = undefined!, // set later
-    mainFile = ref('src/App.vue'),
+    mainFile = ref('Main.vue'),
     template = ref({
       welcomeSFC: welcomeSFCCode,
       newSFC: newSFCCode,
@@ -65,7 +72,7 @@ export function useStore(
 
   function init() {
     watchEffect(() => {
-      compileFile(store, activeFile.value).then((errs) => (errors.value = errs))
+      compileFile(store).then((errs) => (errors.value = errs))
     })
 
     watch(
@@ -88,24 +95,24 @@ export function useStore(
       { deep: true },
     )
 
-    watch(
-      vueVersion,
-      async (version) => {
-        if (version) {
-          const compilerUrl = `https://cdn.jsdelivr.net/npm/@vue/compiler-sfc@${version}/dist/compiler-sfc.esm-browser.js`
-          loading.value = true
-          compiler.value = await import(/* @vite-ignore */ compilerUrl).finally(
-            () => (loading.value = false),
-          )
-          console.info(`[@vue/repl] Now using Vue version: ${version}`)
-        } else {
-          // reset to default
-          compiler.value = defaultCompiler
-          console.info(`[@vue/repl] Now using default Vue version`)
-        }
-      },
-      { immediate: true },
-    )
+    // watch(
+    //   vueVersion,
+    //   async (version) => {
+    //     if (version) {
+    //       const compilerUrl = `https://cdn.jsdelivr.net/npm/@vue/compiler-sfc@${version}/dist/compiler-sfc.esm-browser.js`
+    //       loading.value = true
+    //       compiler.value = await import(/* @vite-ignore */ compilerUrl).finally(
+    //         () => (loading.value = false),
+    //       )
+    //       console.info(`[@vue/repl] Now using Vue version: ${version}`)
+    //     } else {
+    //       // reset to default
+    //       compiler.value = defaultCompiler
+    //       console.info(`[@vue/repl] Now using default Vue version`)
+    //     }
+    //   },
+    //   { immediate: true },
+    // )
 
     watch(
       sfcOptions,
@@ -135,11 +142,7 @@ export function useStore(
 
     // compile rest of the files
     errors.value = []
-    for (const [filename, file] of Object.entries(files.value)) {
-      if (filename !== mainFile.value) {
-        compileFile(store, file).then((errs) => errors.value.push(...errs))
-      }
-    }
+    compileFile(store).then((errs) => errors.value.push(...errs))
   }
 
   function setImportMap(map: ImportMap) {
@@ -161,67 +164,7 @@ export function useStore(
   const setActive: Store['setActive'] = (filename) => {
     activeFilename.value = filename
   }
-  const addFile: Store['addFile'] = (fileOrFilename) => {
-    let file: File
-    if (typeof fileOrFilename === 'string') {
-      file = new File(
-        fileOrFilename,
-        fileOrFilename.endsWith('.vue') ? template.value.newSFC : '',
-      )
-    } else {
-      file = fileOrFilename
-    }
-    files.value[file.filename] = file
-    if (!file.hidden) setActive(file.filename)
-  }
-  const deleteFile: Store['deleteFile'] = (filename) => {
-    if (
-      !confirm(`Are you sure you want to delete ${stripSrcPrefix(filename)}?`)
-    ) {
-      return
-    }
 
-    if (activeFilename.value === filename) {
-      activeFilename.value = mainFile.value
-    }
-    delete files.value[filename]
-  }
-  const renameFile: Store['renameFile'] = (oldFilename, newFilename) => {
-    const file = files.value[oldFilename]
-
-    if (!file) {
-      errors.value = [`Could not rename "${oldFilename}", file not found`]
-      return
-    }
-
-    if (!newFilename || oldFilename === newFilename) {
-      errors.value = [`Cannot rename "${oldFilename}" to "${newFilename}"`]
-      return
-    }
-
-    file.filename = newFilename
-    const newFiles: Record<string, File> = {}
-
-    // Preserve iteration order for files
-    for (const [name, file] of Object.entries(files.value)) {
-      if (name === oldFilename) {
-        newFiles[newFilename] = file
-      } else {
-        newFiles[name] = file
-      }
-    }
-
-    files.value = newFiles
-
-    if (mainFile.value === oldFilename) {
-      mainFile.value = newFilename
-    }
-    if (activeFilename.value === oldFilename) {
-      activeFilename.value = newFilename
-    } else {
-      compileFile(store, file).then((errs) => (errors.value = errs))
-    }
-  }
   const getImportMap: Store['getImportMap'] = () => {
     try {
       return JSON.parse(files.value[importMapFile].code)
@@ -303,16 +246,14 @@ export function useStore(
 
     mainFile = addSrcPrefix(mainFile)
     if (!newFiles[mainFile]) {
-      setFile(files, mainFile, template.value.welcomeSFC || welcomeSFCCode)
+      setFile(files, mainFile, '')
     }
     for (const [filename, file] of Object.entries(newFiles)) {
       setFile(files, filename, file)
     }
 
     const errors = []
-    for (const file of Object.values(files)) {
-      errors.push(...(await compileFile(store, file)))
-    }
+    errors.push(...(await compileFile(store)))
 
     store.mainFile = mainFile
     store.files = files
@@ -321,22 +262,18 @@ export function useStore(
     setActive(store.mainFile)
   }
   const setDefaultFile = (): void => {
-    setFile(
-      files.value,
-      mainFile.value,
-      template.value.welcomeSFC || welcomeSFCCode,
-    )
+    setFile(files.value, mainFile.value, '')
   }
 
   if (serializedState) {
     deserialize(serializedState)
   } else {
-    setDefaultFile()
+    //setDefaultFile()
   }
   if (!files.value[mainFile.value]) {
     mainFile.value = Object.keys(files.value)[0]
   }
-  activeFilename ||= ref(mainFile.value)
+  activeFilename ||= ref('Setup.js')
   const activeFile = computed(() => files.value[activeFilename.value])
 
   applyBuiltinImportMap()
@@ -364,9 +301,6 @@ export function useStore(
 
     init,
     setActive,
-    addFile,
-    deleteFile,
-    renameFile,
     getImportMap,
     getTsConfig,
     serialize,
@@ -388,7 +322,7 @@ const tsconfig = {
     allowImportingTsExtensions: true,
   },
   vueCompilerOptions: {
-    target: 3.4,
+    target: 3.5,
   },
 }
 
@@ -432,9 +366,6 @@ export interface ReplStore extends UnwrapRef<StoreState> {
   loading: boolean
   init(): void
   setActive(filename: string): void
-  addFile(filename: string | File): void
-  deleteFile(filename: string): void
-  renameFile(oldFilename: string, newFilename: string): void
   getImportMap(): ImportMap
   getTsConfig(): Record<string, any>
   serialize(): string
@@ -460,9 +391,6 @@ export type Store = Pick<
   | 'reloadLanguageTools'
   | 'init'
   | 'setActive'
-  | 'addFile'
-  | 'deleteFile'
-  | 'renameFile'
   | 'getImportMap'
   | 'getTsConfig'
 >
@@ -482,14 +410,15 @@ export class File {
   ) {}
 
   get language() {
+    
     if (this.filename.endsWith('.vue')) {
-      return 'vue'
+      return 'jsx'
     }
     if (this.filename.endsWith('.html')) {
       return 'html'
     }
     if (this.filename.endsWith('.css')) {
-      return 'css'
+      return 'scss'
     }
     if (this.filename.endsWith('.ts')) {
       return 'typescript'

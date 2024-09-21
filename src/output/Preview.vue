@@ -1,5 +1,12 @@
 <script setup lang="ts">
+// @ts-expect-error
+import cloneDeep from 'lodash-es/cloneDeep'
 import Message from '../Message.vue'
+// @ts-expect-error
+import * as loaderModule from /*@vite-ignore*/ '@unimindsoftware/app-loader'
+// @ts-expect-error
+import { useAppState } from '@unimindsoftware/core'
+
 import {
   type WatchStopHandle,
   inject,
@@ -15,6 +22,20 @@ import { PreviewProxy } from './PreviewProxy'
 import { compileModulesForPreview } from './moduleCompiler'
 import { injectKeyProps } from '../../src/types'
 
+// Extend the Window interface to include _UniMindUIApp
+declare global {
+  interface Window {
+    _UniMindUIApp?: {
+      config: {
+        globalProperties: {
+          $appConfig: {
+            appLoader: Function
+          }
+        }
+      }
+    }
+  }
+}
 const props = defineProps<{ show: boolean; ssr: boolean }>()
 
 const { store, clearConsole, theme, previewTheme, previewOptions } =
@@ -63,6 +84,21 @@ onUnmounted(() => {
   proxy.destroy()
   stopUpdateWatcher && stopUpdateWatcher()
 })
+const initState = {
+  authToken: '',
+  contentId: '',
+  langCode: '',
+  tenantCode: '',
+  userName: '',
+}
+{
+  const { authToken, contentId, langCode, tenantCode, userName } = useAppState()
+  initState.authToken = authToken.value
+  initState.contentId = contentId.value
+  initState.langCode = langCode.value
+  initState.tenantCode = tenantCode.value
+  initState.userName = userName.value
+}
 
 function createSandbox() {
   if (sandbox) {
@@ -87,6 +123,11 @@ function createSandbox() {
   )
 
   const importMap = store.value.getImportMap()
+
+  importMap.imports = {
+    ...importMap.imports,
+    ...loaderModule.importMaps,
+  }
   const sandboxSrc = srcdoc
     .replace(
       /<html>/,
@@ -192,7 +233,7 @@ async function updatePreview() {
 
     // if SSR, generate the SSR bundle and eval it to render the HTML
     if (isSSR && mainFile.endsWith('.vue')) {
-      const ssrModules = compileModulesForPreview(store.value, true)
+      const ssrModules = await compileModulesForPreview(store.value, true)
       console.info(
         `[@vue/repl] successfully compiled ${ssrModules.length} modules for SSR.`,
       )
@@ -220,7 +261,7 @@ async function updatePreview() {
     }
 
     // compile code to simulated module system
-    const modules = compileModulesForPreview(store.value)
+    const modules = await compileModulesForPreview(store.value)
     console.info(
       `[@vue/repl] successfully compiled ${modules.length} module${
         modules.length > 1 ? `s` : ``
@@ -229,40 +270,29 @@ async function updatePreview() {
 
     const codeToEval = [
       `window.__modules__ = {};window.__css__ = [];` +
-        `if (window.__app__) window.__app__.unmount();` +
+        `if (window._UniMindUIApp) {try{window._UniMindUIApp.unmount();}catch(e){console.clear()};}` +
         (isSSR
           ? ``
-          : `document.body.innerHTML = '<div id="app"></div>' + \`${
+          : `document.body.innerHTML = '<uc-app></uc-app>' + \`${
               previewOptions.value?.bodyHTML || ''
             }\``),
       ...modules,
-      `document.querySelectorAll('style[css]').forEach(el => el.remove())
-        document.head.insertAdjacentHTML('beforeend', window.__css__.map(s => \`<style css>\${s}</style>\`).join('\\n'))`,
+      `setTimeout(()=> {
+        document.querySelectorAll('style[css]').forEach(el => el.remove())
+        document.head.insertAdjacentHTML('beforeend', window.__css__.map(s => \`<style css>\${s}</style>\`).join('\\n'))
+      }, 1)`,
     ]
 
     // if main file is a vue file, mount it.
     if (mainFile.endsWith('.vue')) {
       codeToEval.push(
-        `import { ${
-          isSSR ? `createSSRApp` : `createApp`
-        } as _createApp } from "vue"
+        `import { load } from '@unimindsoftware/app-loader';
+        import * as VUE from 'vue'
+        window._VUE = VUE;
         ${previewOptions.value?.customCode?.importCode || ''}
-        const _mount = () => {
-          const AppComponent = __modules__["${mainFile}"].default
-          AppComponent.name = 'Repl'
-          const app = window.__app__ = _createApp(AppComponent)
-          if (!app.config.hasOwnProperty('unwrapInjectedRef')) {
-            app.config.unwrapInjectedRef = true
-          }
-          app.config.errorHandler = e => console.error(e)
+        __modules__['Container.js'].default(${JSON.stringify(initState)})
           ${previewOptions.value?.customCode?.useCode || ''}
-          app.mount('#app')
-        }
-        if (window.__ssr_promise__) {
-          window.__ssr_promise__.then(_mount)
-        } else {
-          _mount()
-        }`,
+        `,
       )
     }
 

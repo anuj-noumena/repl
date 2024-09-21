@@ -8,6 +8,7 @@ export default defineConfig({
     alias: {
       '@vue/compiler-dom': '@vue/compiler-dom/dist/compiler-dom.cjs.js',
       '@vue/compiler-core': '@vue/compiler-core/dist/compiler-core.cjs.js',
+      '@unimindsoftware/plugin-vue/compiler': './node_modules/@unimindsoftware/plugin-vue/dist/compiler.mjs',
     },
   },
   build: {

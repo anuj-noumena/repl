@@ -1,5 +1,6 @@
 import { type Plugin, mergeConfig } from 'vite'
 import dts from 'vite-plugin-dts'
+import vuetify from 'vite-plugin-vuetify'
 import base from './vite.preview.config'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -41,7 +42,16 @@ const patchCssFiles: Plugin = {
 }
 
 export default mergeConfig(base, {
+  resolve: {
+    alias: {
+      '@vue/compiler-dom': '@vue/compiler-dom/dist/compiler-dom.cjs.js',
+      '@vue/compiler-core': '@vue/compiler-core/dist/compiler-core.cjs.js',
+    },
+  },
   plugins: [
+    vuetify({
+      styles: { configFile: 'src/settings.scss' },
+    }),
     dts({
       rollupTypes: true,
     }),
@@ -55,6 +65,7 @@ export default mergeConfig(base, {
       'monaco-editor-core/esm/vs/editor/editor.worker',
       'vue/server-renderer',
     ],
+    exclude: ['vuetify', '@unimindsoftware/plugin-vue'],
   },
   base: './',
   build: {
@@ -74,7 +85,7 @@ export default mergeConfig(base, {
       output: {
         chunkFileNames: 'chunks/[name]-[hash].js',
       },
-      external: ['vue', 'vue/compiler-sfc'],
+      external: ['vue', '@unimindsoftware/app-loader', 'lodash-es', '@unimindsoftware/core', '@unimindsoftware/router', '@unimindsoftware/router/mock'],
     },
   },
 })
