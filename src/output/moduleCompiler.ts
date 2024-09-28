@@ -13,19 +13,24 @@ import container from './container'
 import type { ExportSpecifier, Identifier, Node } from '@babel/types'
 import { compileCode } from '../transform'
 
+export async function compileContainer(store: Store) {
+  const { compiled, errors } = await compileCode(
+    container(store.mainFile || 'Main.js'),
+    'Container.js',
+    false,
+  )
+  if (errors && errors.length) {
+    throw errors[0]
+  }
+
+  return compiled
+}
+
 export async function compileModulesForPreview(store: Store, isSSR = false) {
   const seen = new Set<File>()
   const processed: string[] = []
   processFile(store, store.files[store.mainFile], processed, seen, isSSR)
-  const { errors, file } = await compileCode(
-    container(store.mainFile),
-    'Container.js',
-    false,
-  )
-  if(errors && errors.length) {
-    throw errors[0]
-  }
-  if (file) processFile(store, file, processed, seen, false)
+
   if (!isSSR) {
     // also add css files that are not imported
     for (const filename in store.files) {
@@ -69,11 +74,7 @@ function processFile(
     code: js,
     importedFiles,
     hasDynamicImport,
-  } = processModule(
-    store,
-    isSSR ? file.compiled.ssr : file.compiled.js,
-    file.filename,
-  )
+  } = processModule(store, file.compiled.js, file.filename)
   processChildFiles(
     store,
     importedFiles,

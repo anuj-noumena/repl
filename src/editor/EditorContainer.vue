@@ -39,6 +39,7 @@ watch(showMessage, () => {
     <props.editorComponent
       :value="store.activeFile.code"
       :filename="store.activeFile.filename"
+      :mode="store.activeFile.language"
       @change="onChange"
     />
     <Message v-show="showMessage" :err="store.errors[0]" />
@@ -48,11 +49,6 @@ watch(showMessage, () => {
         v-if="editorOptions?.showErrorText !== false"
         v-model="showMessage"
         :text="editorOptions?.showErrorText || 'Show Error'"
-      />
-      <ToggleButton
-        v-if="editorOptions?.autoSaveText !== false"
-        v-model="autoSave"
-        :text="editorOptions?.autoSaveText || 'Auto Save'"
       />
     </div>
   </div>

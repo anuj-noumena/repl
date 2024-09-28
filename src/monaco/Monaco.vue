@@ -46,7 +46,7 @@ const {
 
 initMonaco(store.value)
 
-const lang = computed(() => (props.mode === 'css' ? 'css' : 'javascript'))
+const lang = computed(() => props.mode || 'javascript')
 
 let editorInstance: monaco.editor.IStandaloneCodeEditor
 function emitChangeEvent() {

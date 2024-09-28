@@ -8,12 +8,32 @@ import {
   initCore,
   useConfigStore,
 } from '@unimindsoftware/theme'
-import { Suspense, ref, watch } from 'vue'
+import { Suspense, ref, watch, inject, nextTick } from 'vue'
 import router from "@unimindsoftware/router/mock";
-
+import * as VUE from 'vue'
 // Styles
 import '@styles/styles/index.scss'
+window._VUE = VUE;
 
+const appLoaderSymbol = Symbol('appReloader')
+window._appLoaderSymbol = appLoaderSymbol;
+
+const AppComponent = {
+  name: 'Repl',
+  setup() {
+    const {canLoad} = inject(appLoaderSymbol);
+    return {canLoad}
+  },
+  render() {
+    if(this.canLoad && __modules__?.['${mainFile}']?.default) {
+      const Comp1 = __modules__['${mainFile}'].default
+      Comp1.name = 'Repl';
+      
+      return <Comp1></Comp1>
+    }
+    return null;
+  },
+}
 
 const container = {
   name: 'uc-container',
@@ -23,7 +43,11 @@ const container = {
       default: () => {},
     },
   },
+  errorCaptured(err, vm, info) {
+    console.error(err, vm, info)
+  },
   setup(props) {
+    try{
     const { global } = useTheme()
     initCore()
     initConfigStore()
@@ -41,8 +65,6 @@ const container = {
       },
       { immediate: true },
     )
-    const AppComponent = __modules__['${mainFile}'].default
-    AppComponent.name = 'Repl'
 
     return () => (
       <v-app
@@ -61,10 +83,13 @@ const container = {
         ></uc-alert>
       </v-app>
     )
+    } catch (e) {
+      console.debug(e);
+    }
+    
   },
 }
-
-export default async initState =>
+const invokeLoader = async (initState, initRoute) =>
   load(async ({ UIConfig, initializeApp, appConfig }) => {
     const uiConfig = {
       ...UIConfig,
@@ -74,11 +99,41 @@ export default async initState =>
         notificationProvider: null,
         hooks: UIConfig.config.hooks
       },
-      container
+      container,
+      modules: {...UIConfig.modules},
     };
-    uiConfig.modules.router = router;
+    uiConfig.modules.router = {
+      init: {
+        install: app => {
+          router.init.install(app, initRoute);
+        }
+      }
+    };
+    uiConfig.modules.appReloader = {
+      init: {
+        install: app => {
+            const canLoad = ref(true);
+            const reload = async () => {
+              canLoad.value = false;
+              nextTick(() => {
+                canLoad.value = true;
+              });
+              // setTimeout(() => {
+              //   canLoad.value = true;
+              // }, 1);
+            };
+            window._appLoader__reload = reload;
+            app.config.errorHandler = (err, instance, info) => {
+                console.error(err, instance, info);
+            };
+            app.config.warnHandler = (msg) => {
+              console.debug(msg);
+            };
+            app.provide(appLoaderSymbol, { reload, canLoad });
+        }
+      }
+    };
     await initializeApp(uiConfig, initState);
     return true;
   });
 `
-

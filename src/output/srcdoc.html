@@ -27,6 +27,7 @@
         }
 
         window.__dynamic_import__ = (key) => {
+          console.log('dynamic import', key)
           return Promise.resolve(window.__modules__[key])
         }
 
@@ -117,6 +118,13 @@
         window.onerror = function (msg, url, lineNo, columnNo, error) {
           // ignore errors from import map polyfill - these are necessary for
           // it to detect browser support
+          if (
+            msg.includes(
+              'ResizeObserver loop completed with undelivered notifications',
+            )
+          ) {
+            return false
+          }
           if (msg.includes('module specifier “vue”')) {
             // firefox only error, ignore
             return false
@@ -368,8 +376,12 @@
     <script type="importmap">
       <!--IMPORT_MAP-->
     </script>
+    <script type="module">
+      <!--INIT_CODE-->
+    </script>
   </head>
   <body>
     <!--PREVIEW-OPTIONS-PLACEHOLDER-HTML-->
+    <uc-app></uc-app>
   </body>
 </html>

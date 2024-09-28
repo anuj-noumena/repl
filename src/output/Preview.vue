@@ -5,7 +5,7 @@ import Message from '../Message.vue'
 // @ts-expect-error
 import * as loaderModule from /*@vite-ignore*/ '@unimindsoftware/app-loader'
 // @ts-expect-error
-import { useAppState } from '@unimindsoftware/core'
+import { useAppState, useRoute } from '@unimindsoftware/core'
 
 import {
   type WatchStopHandle,
@@ -19,7 +19,7 @@ import {
 } from 'vue'
 import srcdoc from './srcdoc.html?raw'
 import { PreviewProxy } from './PreviewProxy'
-import { compileModulesForPreview } from './moduleCompiler'
+import { compileContainer, compileModulesForPreview } from './moduleCompiler'
 import { injectKeyProps } from '../../src/types'
 
 // Extend the Window interface to include _UniMindUIApp
@@ -81,7 +81,7 @@ function switchPreviewTheme() {
 watch([theme, previewTheme], switchPreviewTheme)
 
 onUnmounted(() => {
-  proxy.destroy()
+  proxy?.destroy()
   stopUpdateWatcher && stopUpdateWatcher()
 })
 const initState = {
@@ -91,6 +91,18 @@ const initState = {
   tenantCode: '',
   userName: '',
 }
+const initRoute = {
+  fullPath: '/s/en-us/test45',
+  hash: '',
+  href: '#/s/en-us/test45',
+  matched: [],
+  meta: {},
+  name: 'default',
+  params: { tenantCode: 's', langCode: 'en-us', contentId: 'test45' },
+  path: '/s/en-us/test45',
+  query: {},
+}
+
 {
   const { authToken, contentId, langCode, tenantCode, userName } = useAppState()
   initState.authToken = authToken.value
@@ -99,8 +111,23 @@ const initState = {
   initState.tenantCode = tenantCode.value
   initState.userName = userName.value
 }
+{
+  const { fullPath, hash, href, meta, name, params, path, query } = useRoute()
 
-function createSandbox() {
+  initRoute.fullPath = fullPath
+  initRoute.hash = hash
+  initRoute.href = href
+  initRoute.matched = []
+  initRoute.meta = meta
+  initRoute.name = name
+  initRoute.params = params
+  initRoute.path = path
+  initRoute.query = query
+}
+
+
+async function createSandbox() {
+  const containerCode = await compileContainer(store.value)
   if (sandbox) {
     // clear prev sandbox
     proxy.destroy()
@@ -128,12 +155,14 @@ function createSandbox() {
     ...importMap.imports,
     ...loaderModule.importMaps,
   }
+  
   const sandboxSrc = srcdoc
     .replace(
       /<html>/,
       `<html class="${previewTheme.value ? theme.value : ''}">`,
     )
     .replace(/<!--IMPORT_MAP-->/, JSON.stringify(importMap))
+    .replace(/<!--INIT_CODE-->/, containerCode + '\n' + `invokeLoader(${JSON.stringify(initState)}, ${JSON.stringify(initRoute)})`)
     .replace(
       /<!-- PREVIEW-OPTIONS-HEAD-HTML -->/,
       previewOptions.value?.headHTML || '',
@@ -150,6 +179,7 @@ function createSandbox() {
       // pending_imports = progress;
     },
     on_error: (event: any) => {
+      console.log('error', event);
       const msg =
         event.value instanceof Error ? event.value.message : event.value
       if (
@@ -214,51 +244,10 @@ async function updatePreview() {
   runtimeError.value = undefined
   runtimeWarning.value = undefined
 
-  let isSSR = props.ssr
-  if (store.value.vueVersion) {
-    const [major, minor, patch] = store.value.vueVersion
-      .split('.')
-      .map((v) => parseInt(v, 10))
-    if (major === 3 && (minor < 2 || (minor === 2 && patch < 27))) {
-      alert(
-        `The selected version of Vue (${store.value.vueVersion}) does not support in-browser SSR.` +
-          ` Rendering in client mode instead.`,
-      )
-      isSSR = false
-    }
-  }
+
 
   try {
     const { mainFile } = store.value
-
-    // if SSR, generate the SSR bundle and eval it to render the HTML
-    if (isSSR && mainFile.endsWith('.vue')) {
-      const ssrModules = await compileModulesForPreview(store.value, true)
-      console.info(
-        `[@vue/repl] successfully compiled ${ssrModules.length} modules for SSR.`,
-      )
-      await proxy.eval([
-        `const __modules__ = {};`,
-        ...ssrModules,
-        `import { renderToString as _renderToString } from 'vue/server-renderer'
-         import { createSSRApp as _createApp } from 'vue'
-         const AppComponent = __modules__["${mainFile}"].default
-         AppComponent.name = 'Repl'
-         const app = _createApp(AppComponent)
-         if (!app.config.hasOwnProperty('unwrapInjectedRef')) {
-           app.config.unwrapInjectedRef = true
-         }
-         app.config.warnHandler = () => {}
-         window.__ssr_promise__ = _renderToString(app).then(html => {
-           document.body.innerHTML = '<div id="app">' + html + '</div>' + \`${
-             previewOptions.value?.bodyHTML || ''
-           }\`
-         }).catch(err => {
-           console.error("SSR Error", err)
-         })
-        `,
-      ])
-    }
 
     // compile code to simulated module system
     const modules = await compileModulesForPreview(store.value)
@@ -269,15 +258,11 @@ async function updatePreview() {
     )
 
     const codeToEval = [
-      `window.__modules__ = {};window.__css__ = [];` +
-        `if (window._UniMindUIApp) {try{window._UniMindUIApp.unmount();}catch(e){console.clear()};}` +
-        (isSSR
-          ? ``
-          : `document.body.innerHTML = '<uc-app></uc-app>' + \`${
-              previewOptions.value?.bodyHTML || ''
-            }\``),
+      `window.__modules__ = {};window.__css__ = [];`,
+        //`if (window._UniMindUIApp) {try{window._UniMindUIApp.unmount();}catch(e){console.clear()};}` +
       ...modules,
       `setTimeout(()=> {
+        window._appLoader__reload?.()
         document.querySelectorAll('style[css]').forEach(el => el.remove())
         document.head.insertAdjacentHTML('beforeend', window.__css__.map(s => \`<style css>\${s}</style>\`).join('\\n'))
       }, 1)`,
@@ -286,11 +271,8 @@ async function updatePreview() {
     // if main file is a vue file, mount it.
     if (mainFile.endsWith('.vue')) {
       codeToEval.push(
-        `import { load } from '@unimindsoftware/app-loader';
-        import * as VUE from 'vue'
-        window._VUE = VUE;
-        ${previewOptions.value?.customCode?.importCode || ''}
-        __modules__['Container.js'].default(${JSON.stringify(initState)})
+        `${previewOptions.value?.customCode?.importCode || ''}
+        
           ${previewOptions.value?.customCode?.useCode || ''}
         `,
       )
@@ -299,7 +281,6 @@ async function updatePreview() {
     // eval code in sandbox
     await proxy.eval(codeToEval)
   } catch (e: any) {
-    console.error(e)
     runtimeError.value = (e as Error).message
   }
 }

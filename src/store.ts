@@ -7,6 +7,7 @@ import {
   shallowRef,
   watch,
   watchEffect,
+  version as _vueVersion,
 } from 'vue'
 import * as defaultCompiler from 'vue/compiler-sfc'
 import { compileFile } from './transform'
@@ -20,36 +21,88 @@ import type { OutputModes } from './types'
 import type { editor } from 'monaco-editor-core'
 import { type ImportMap, mergeImportMap, useVueImportMap } from './import-map'
 
-import welcomeSFCCode from './template/welcome.vue?raw'
-import newSFCCode from './template/new-sfc.vue?raw'
-
 export const importMapFile = 'import-map.json'
 export const tsconfigFile = 'tsconfig.json'
 
+const createFiles = (contentType: number, content: string) => {
+  switch (contentType) {
+    case 0:
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(content, 'text/html')
+
+      const styleTag = doc.querySelector('style')?.innerHTML.trim()
+      const templateTag = doc.querySelector('template')?.innerHTML.trim()
+      const setupTag = doc.querySelector('script[setup]')?.innerHTML.trim()
+      const scriptTag = doc.querySelector('script:not([setup]):not([template])')?.innerHTML.trim()
+      // page
+      return {
+        preview: 'Main.vue',
+        activeFilename: 'Setup.js',
+        files: {
+          'Main.vue': new File('Main.vue', '', true, 'javascript'),
+          'Script.js': new File('Script.js', scriptTag, false, 'javascript'),
+          'Setup.js': new File('Setup.js', setupTag, false, 'javascript'),
+          'Template.js': new File('Template.js', templateTag, false, 'javascript'),
+          'Style.css': new File('Style.css', styleTag, false, 'scss'),
+        },
+      }
+    case 1:
+      // html
+      return {
+        preview: 'Main.html',
+        activeFilename: 'Main.html',
+        files: {
+          'Main.html': new File('Main.html', content, false, 'html'),
+        },
+      }
+    case 2:
+      // javascript
+      return {
+        preview: false,
+        activeFilename: 'Main.js',
+        files: {
+          'Main.js': new File('Main.js', content, false, 'javascript'),
+        },
+      }
+    case 3:
+      // css
+      return {
+        preview: false,
+        activeFilename: 'Main.css',
+        files: {
+          'Main.css': new File('Main.css', content, false, 'scss'),
+        },
+      }
+    case 4:
+      // json
+      return {
+        preview: false,
+        activeFilename: 'Main.json',
+        files: {
+          'Main.json': new File('Main.json', content, false, 'json'),
+        },
+      }
+  }
+  return {
+    preview: 'Main.vue',
+    activeFilename: 'Main.vue',
+    files: {
+      'Main.vue': new File('Main.vue', content, true, 'javascript'),
+    },
+  }
+}
+
 export function useStore(
   {
-    files = ref({
-      'Setup.js': new File('Setup.js', ''),
-      'Script.js': new File('Script.js', ''),
-      'Template.js': new File('Template.js', ''),
-      'Style.css': new File('Style.css', ''),
-      'Main.vue': new File('Main.vue', '', true),
-    }),
-    
-    activeFilename = undefined!, // set later
-    mainFile = ref('Main.vue'),
-    template = ref({
-      welcomeSFC: welcomeSFCCode,
-      newSFC: newSFCCode,
-    }),
+    contentId = ref('test'),
+    contentType = ref(0),
+    content = ref(''),
+
     builtinImportMap = undefined!, // set later
 
     errors = ref([]),
-    showOutput = ref(false),
     outputMode = ref('preview'),
     sfcOptions = ref({}),
-    compiler = shallowRef(defaultCompiler),
-    vueVersion = ref(null),
 
     locale = ref(),
     typescriptVersion = ref('latest'),
@@ -58,12 +111,26 @@ export function useStore(
   }: Partial<StoreState> = {},
   serializedState?: string,
 ): ReplStore {
+  const vueVersion = ref(_vueVersion)
   if (!builtinImportMap) {
-    ;({ importMap: builtinImportMap, vueVersion } = useVueImportMap({
+    ;({ importMap: builtinImportMap } = useVueImportMap({
       vueVersion: vueVersion.value,
     }))
   }
+
+  const showOutput = ref(false)
   const loading = ref(false)
+  const compiler = shallowRef(defaultCompiler)
+  const activeFilename = ref('')
+
+  const preview = ref<string | boolean>(false)
+  const files = ref<Record<string, File>>({})
+  const _o1 = createFiles(contentType.value, content.value)
+  preview.value = _o1.preview
+  activeFilename.value = _o1.activeFilename
+  files.value = Object.fromEntries(
+    Object.entries(_o1.files).filter(([_, file]) => file !== undefined),
+  )
 
   function applyBuiltinImportMap() {
     const importMap = mergeImportMap(builtinImportMap.value, getImportMap())
@@ -76,70 +143,20 @@ export function useStore(
     })
 
     watch(
-      () => [
-        files.value[tsconfigFile]?.code,
-        typescriptVersion.value,
-        locale.value,
-        dependencyVersion.value,
-        vueVersion.value,
-      ],
-      () => reloadLanguageTools.value?.(),
-      { deep: true },
-    )
-
-    watch(
       builtinImportMap,
       () => {
         setImportMap(mergeImportMap(getImportMap(), builtinImportMap.value))
       },
       { deep: true },
     )
-
-    // watch(
-    //   vueVersion,
-    //   async (version) => {
-    //     if (version) {
-    //       const compilerUrl = `https://cdn.jsdelivr.net/npm/@vue/compiler-sfc@${version}/dist/compiler-sfc.esm-browser.js`
-    //       loading.value = true
-    //       compiler.value = await import(/* @vite-ignore */ compilerUrl).finally(
-    //         () => (loading.value = false),
-    //       )
-    //       console.info(`[@vue/repl] Now using Vue version: ${version}`)
-    //     } else {
-    //       // reset to default
-    //       compiler.value = defaultCompiler
-    //       console.info(`[@vue/repl] Now using default Vue version`)
-    //     }
-    //   },
-    //   { immediate: true },
-    // )
-
-    watch(
-      sfcOptions,
-      () => {
-        sfcOptions.value.script ||= {}
-        sfcOptions.value.script.fs = {
-          fileExists(file: string) {
-            if (file.startsWith('/')) file = file.slice(1)
-            return !!store.files[file]
-          },
-          readFile(file: string) {
-            if (file.startsWith('/')) file = file.slice(1)
-            return store.files[file].code
-          },
-        }
-      },
-      { immediate: true },
-    )
-
-    // init tsconfig
     if (!files.value[tsconfigFile]) {
       files.value[tsconfigFile] = new File(
         tsconfigFile,
         JSON.stringify(tsconfig, undefined, 2),
+        true,
+        'json',
       )
     }
-
     // compile rest of the files
     errors.value = []
     compileFile(store).then((errs) => errors.value.push(...errs))
@@ -182,108 +199,50 @@ export function useStore(
       return {}
     }
   }
-  const serialize: ReplStore['serialize'] = () => {
-    const files = getFiles()
-    const importMap = files[importMapFile]
-    if (importMap) {
-      const parsed = JSON.parse(importMap)
-      const builtin = builtinImportMap.value.imports || {}
 
-      if (parsed.imports) {
-        for (const [key, value] of Object.entries(parsed.imports)) {
-          if (builtin[key] === value) {
-            delete parsed.imports[key]
-          }
-        }
-        if (parsed.imports && !Object.keys(parsed.imports).length) {
-          delete parsed.imports
-        }
-      }
-      if (parsed.scopes && !Object.keys(parsed.scopes).length) {
-        delete parsed.scopes
-      }
-      if (Object.keys(parsed).length) {
-        files[importMapFile] = JSON.stringify(parsed, null, 2)
-      } else {
-        delete files[importMapFile]
-      }
-    }
-    if (vueVersion.value) files._version = vueVersion.value
-    return '#' + utoa(JSON.stringify(files))
-  }
-  const deserialize: ReplStore['deserialize'] = (serializedState: string) => {
-    if (serializedState.startsWith('#'))
-      serializedState = serializedState.slice(1)
-    let saved: any
-    try {
-      saved = JSON.parse(atou(serializedState))
-    } catch (err) {
-      console.error(err)
-      alert('Failed to load code from URL.')
-      return setDefaultFile()
-    }
-    for (const filename in saved) {
-      if (filename === '_version') {
-        vueVersion.value = saved[filename]
-      } else {
-        setFile(files.value, filename, saved[filename])
-      }
-    }
-  }
-  const getFiles: ReplStore['getFiles'] = () => {
-    const exported: Record<string, string> = {}
-    for (const [filename, file] of Object.entries(files.value)) {
-      const normalized = stripSrcPrefix(filename)
-      exported[normalized] = file.code
-    }
-    return exported
-  }
-  const setFiles: ReplStore['setFiles'] = async (
-    newFiles,
-    mainFile = store.mainFile,
-  ) => {
-    const files: Record<string, File> = Object.create(null)
-
-    mainFile = addSrcPrefix(mainFile)
-    if (!newFiles[mainFile]) {
-      setFile(files, mainFile, '')
-    }
-    for (const [filename, file] of Object.entries(newFiles)) {
-      setFile(files, filename, file)
-    }
-
-    const errors = []
-    errors.push(...(await compileFile(store)))
-
-    store.mainFile = mainFile
-    store.files = files
-    store.errors = errors
-    applyBuiltinImportMap()
-    setActive(store.mainFile)
-  }
-  const setDefaultFile = (): void => {
-    setFile(files.value, mainFile.value, '')
-  }
-
-  if (serializedState) {
-    deserialize(serializedState)
-  } else {
-    //setDefaultFile()
-  }
-  if (!files.value[mainFile.value]) {
-    mainFile.value = Object.keys(files.value)[0]
-  }
-  activeFilename ||= ref('Setup.js')
   const activeFile = computed(() => files.value[activeFilename.value])
-
+  const mainFile = computed(() =>
+    typeof preview.value == 'string' ? preview.value : '',
+  )
   applyBuiltinImportMap()
+  const getContent = () => {
+    return Object.fromEntries(
+      Object.entries(files.value).map(([key, file]) => [
+        key,
+        file.code ? atou(file.code) : '',
+      ]),
+    )
+  }
 
+  const setContent = async (
+    _contentType: number,
+    _contentId: string,
+    _content: string,
+  ) => {
+    const _o2 = createFiles(_contentType, _content)
+    preview.value = _o2.preview
+    activeFilename.value = _o2.activeFilename
+    contentId.value = _contentId
+    content.value = _content
+    contentType.value = _contentType
+    files.value = Object.fromEntries(
+      Object.entries(_o2.files).filter(([_, file]) => file !== undefined),
+    )
+    errors.value = []
+    compileFile(store).then((errs) => errors.value.push(...errs))
+  }
   const store: ReplStore = reactive({
     files,
+    mainFile,
+    preview,
+    content,
+    contentType,
+    contentId,
+    getContent,
+    setContent,
+
     activeFile,
     activeFilename,
-    mainFile,
-    template,
     builtinImportMap,
 
     errors,
@@ -303,10 +262,6 @@ export function useStore(
     setActive,
     getImportMap,
     getTsConfig,
-    serialize,
-    deserialize,
-    getFiles,
-    setFiles,
   })
   return store
 }
@@ -333,13 +288,10 @@ export interface SFCOptions {
 }
 
 export type StoreState = ToRefs<{
-  files: Record<string, File>
+  content: string
+  contentType: number
+  contentId: string
   activeFilename: string
-  mainFile: string
-  template: {
-    welcomeSFC?: string
-    newSFC?: string
-  }
   builtinImportMap: ImportMap
 
   // output
@@ -361,21 +313,27 @@ export type StoreState = ToRefs<{
 }>
 
 export interface ReplStore extends UnwrapRef<StoreState> {
+  files: Record<string, File>
   activeFile: File
+  mainFile: string
+  preview: string | boolean
   /** Loading compiler */
   loading: boolean
   init(): void
   setActive(filename: string): void
   getImportMap(): ImportMap
   getTsConfig(): Record<string, any>
-  serialize(): string
-  deserialize(serializedState: string): void
-  getFiles(): Record<string, string>
-  setFiles(newFiles: Record<string, string>, mainFile?: string): Promise<void>
+  getContent(): Record<string, string>
+  setContent(
+    contentType: number,
+    contentId: string,
+    content: string,
+  ): Promise<void>
 }
 
 export type Store = Pick<
   ReplStore,
+  | 'preview'
   | 'files'
   | 'activeFile'
   | 'mainFile'
@@ -391,6 +349,9 @@ export type Store = Pick<
   | 'reloadLanguageTools'
   | 'init'
   | 'setActive'
+  | 'content'
+  | 'contentType'
+  | 'contentId'
   | 'getImportMap'
   | 'getTsConfig'
 >
@@ -399,7 +360,6 @@ export class File {
   compiled = {
     js: '',
     css: '',
-    ssr: '',
   }
   editorViewState: editor.ICodeEditorViewState | null = null
 
@@ -407,24 +367,25 @@ export class File {
     public filename: string,
     public code = '',
     public hidden = false,
+    public language = 'javascript',
   ) {}
+  //tsx, html, css, scss, typescript, javascript, jsx
+  // get language() {
 
-  get language() {
-    
-    if (this.filename.endsWith('.vue')) {
-      return 'jsx'
-    }
-    if (this.filename.endsWith('.html')) {
-      return 'html'
-    }
-    if (this.filename.endsWith('.css')) {
-      return 'scss'
-    }
-    if (this.filename.endsWith('.ts')) {
-      return 'typescript'
-    }
-    return 'javascript'
-  }
+  //   if (this.filename.endsWith('.vue')) {
+  //     return 'jsx'
+  //   }
+  //   if (this.filename.endsWith('.html')) {
+  //     return 'html'
+  //   }
+  //   if (this.filename.endsWith('.css')) {
+  //     return 'scss'
+  //   }
+  //   if (this.filename.endsWith('.ts')) {
+  //     return 'typescript'
+  //   }
+  //   return 'javascript'
+  //  }
 }
 
 function addSrcPrefix(file: string) {
