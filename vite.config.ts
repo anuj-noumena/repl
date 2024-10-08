@@ -42,19 +42,19 @@ const patchCssFiles: Plugin = {
 }
 
 export default mergeConfig(base, {
-  resolve: {
-    alias: {
-      '@vue/compiler-dom': '@vue/compiler-dom/dist/compiler-dom.cjs.js',
-      '@vue/compiler-core': '@vue/compiler-core/dist/compiler-core.cjs.js',
-    },
-  },
+  // resolve: {
+  //   alias: {
+  //     '@vue/compiler-dom': '@vue/compiler-dom/dist/compiler-dom.cjs.js',
+  //     '@vue/compiler-core': '@vue/compiler-core/dist/compiler-core.cjs.js',
+  //   },
+  // },
   plugins: [
     vuetify({
       styles: { configFile: 'src/settings.scss' },
     }),
-    dts({
-      rollupTypes: true,
-    }),
+    // dts({
+    //   rollupTypes: true,
+    // }),
     genStub,
     patchCssFiles,
     //cssInjectedByJsPlugin(),
@@ -64,13 +64,14 @@ export default mergeConfig(base, {
     include: [
       'typescript',
       'monaco-editor-core/esm/vs/editor/editor.worker',
-      'vue/server-renderer',
     ],
-    exclude: ['vuetify', '@unimindsoftware/plugin-vue'],
+    exclude: [
+      'vuetify',
+    ],
   },
   base: './',
   build: {
-    emptyOutDir: false,
+    emptyOutDir: true,
     target: 'esnext',
     minify: false,
     lib: {
@@ -93,7 +94,8 @@ export default mergeConfig(base, {
         '@unimindsoftware/core',
         '@unimindsoftware/router',
         '@unimindsoftware/router/mock',
-        '@vue/compiler-sfc',
+        /@vue\/.*/,
+        /@unimindsoftware\/plugin-vue\/.*/,
         /vuetify\/.*/,
       ],
     },

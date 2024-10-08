@@ -36,7 +36,7 @@ declare global {
     }
   }
 }
-const props = defineProps<{ show: boolean; ssr: boolean }>()
+const props = defineProps<{ show: boolean; }>()
 
 const { store, clearConsole, theme, previewTheme, previewOptions } =
   inject(injectKeyProps)!
@@ -179,7 +179,6 @@ async function createSandbox() {
       // pending_imports = progress;
     },
     on_error: (event: any) => {
-      console.log('error', event);
       const msg =
         event.value instanceof Error ? event.value.message : event.value
       if (

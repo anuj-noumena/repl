@@ -89,7 +89,7 @@
     "fflate": "^0.8.2",
     "hash-sum": "^2.0.0",
     "lint-staged": "^15.2.10",
-    "monaco-editor-core": "^0.51.0",
+    "monaco-editor-core": "^0.52.0",
     "prettier": "^3.3.3",
     "shiki": "^1.16.2",
     "simple-git-hooks": "^2.11.1",
@@ -100,9 +100,7 @@
     "vite-plugin-dts": "^4.2.1",
     "vscode-uri": "^3.0.8",
     "vue": "catalog:",
-    "vue-tsc": "~2.1.6"
-  },
-  "dependencies": {
+    "vue-tsc": "~2.1.6",
     "@babel/core": "^7.25.2",
     "@babel/helper-module-imports": "^7.24.7",
     "@vitejs/plugin-vue-jsx": "catalog:",

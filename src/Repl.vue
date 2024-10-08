@@ -23,7 +23,6 @@ export interface Props {
   clearConsole?: boolean
   layout?: 'horizontal' | 'vertical'
   layoutReverse?: boolean
-  ssr?: boolean
   previewOptions?: {
     headHTML?: string
     bodyHTML?: string
@@ -53,7 +52,6 @@ const props = withDefaults(defineProps<Props>(), {
   showTsConfig: true,
   clearConsole: false,
   layoutReverse: false,
-  ssr: false,
   layout: 'horizontal',
   previewOptions: () => ({}),
   editorOptions: () => ({}),
@@ -100,7 +98,6 @@ defineExpose({ reload })
           ref="output"
           :editor-component="editor"
           :show-compile-output="props.showCompileOutput"
-          :ssr="!!props.ssr"
         />
       </template>
     </SplitPane>

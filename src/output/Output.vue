@@ -10,14 +10,13 @@ import {
 const props = defineProps<{
   editorComponent: EditorComponentType
   showCompileOutput?: boolean
-  ssr: boolean
 }>()
 
 const { store } = inject(injectKeyProps)!
 const previewRef = useTemplateRef('preview')
 const modes = computed(() =>
   props.showCompileOutput
-    ? (['preview', 'js', 'css', 'ssr'] as const)
+    ? (['preview', 'js', 'css'] as const)
     : (['preview'] as const),
 )
 
@@ -53,7 +52,7 @@ defineExpose({ reload, previewRef })
   </div>
 
   <div class="output-container">
-    <Preview ref="preview" :show="mode === 'preview'" :ssr="ssr" />
+    <Preview ref="preview" :show="mode === 'preview'" />
     <props.editorComponent
       v-if="mode !== 'preview'"
       readonly
