@@ -72,7 +72,7 @@ self.onmessage = async (msg: MessageEvent<WorkerMessage>) => {
         tsconfig.vueCompilerOptions || {},
       )
 
-      const o = createTypeScriptWorkerLanguageService({
+      return createTypeScriptWorkerLanguageService({
         typescript: ts,
         compilerOptions,
         workerContext: ctx,
@@ -94,7 +94,6 @@ self.onmessage = async (msg: MessageEvent<WorkerMessage>) => {
           project.vue = { compilerOptions: vueCompilerOptions }
         },
       })
-      return o
     },
   )
 }

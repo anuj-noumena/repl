@@ -40,7 +40,6 @@ export class PreviewProxy {
     let action = cmd_data.action
     let id = cmd_data.cmd_id
     let handler = this.pending_cmds.get(id)
-    console.log('handle_command_message', action, id, handler, cmd_data)
     if (handler) {
       this.pending_cmds.delete(id)
       if (action === 'cmd_error') {

@@ -63,6 +63,7 @@ export async function reloadLanguageTools(store: Store) {
       '@vue/compiler-core': store.vueVersion,
       '@vue/compiler-dom': store.vueVersion,
       '@vue/compiler-sfc': store.vueVersion,
+      '@vue/compiler-ssr': store.vueVersion,
       '@vue/reactivity': store.vueVersion,
       '@vue/runtime-core': store.vueVersion,
       '@vue/runtime-dom': store.vueVersion,
@@ -76,10 +77,9 @@ export async function reloadLanguageTools(store: Store) {
       typescript: store.typescriptVersion,
     }
   }
-  const label = store.files[store.mainFile].language === 'vue'
-  const moduleId = `vs/language/${label}/${label}Worker`
+
   const worker = editor.createWebWorker<WorkerLanguageService>({
-    moduleId: moduleId,
+    moduleId: 'vs/language/vue/vueWorker',
     label: 'vue',
     host: new WorkerHost(),
     createData: {
@@ -87,7 +87,7 @@ export async function reloadLanguageTools(store: Store) {
       dependencies,
     } satisfies CreateData,
   })
-  const languageId = ['vue', 'javascript', 'typescript', 'css', 'html']
+  const languageId = ['vue', 'javascript', 'typescript']
   const getSyncUris = () =>
     Object.keys(store.files).map((filename) => Uri.parse(`file:///${filename}`))
 
@@ -127,6 +127,7 @@ export interface WorkerMessage {
 export function loadMonacoEnv(store: Store) {
   ;(self as any).MonacoEnvironment = {
     async getWorker(_: any, label: string) {
+      console.log('getWorker', label)
       if (label === 'vue') {
         const worker = new vueWorker()
         const init = new Promise<void>((resolve) => {
@@ -150,13 +151,11 @@ export function loadMonacoEnv(store: Store) {
   languages.register({ id: 'vue', extensions: ['.vue'] })
   languages.register({ id: 'javascript', extensions: ['.js'] })
   languages.register({ id: 'typescript', extensions: ['.ts'] })
-  // languages.register({ id: 'css', extensions: ['.css'] })
-  // languages.register({ id: 'html', extensions: ['.html'] })
+  languages.register({ id: 'css', extensions: ['.css'] })
   languages.setLanguageConfiguration('vue', languageConfigs.vue)
   languages.setLanguageConfiguration('javascript', languageConfigs.js)
   languages.setLanguageConfiguration('typescript', languageConfigs.ts)
-  // languages.setLanguageConfiguration('css', languageConfigs.css)
-  // languages.setLanguageConfiguration('html', languageConfigs.html)
+  languages.setLanguageConfiguration('css', languageConfigs.css)
 
   let languageToolsPromise: Promise<void> | undefined
   store.reloadLanguageTools = debounce(async () => {

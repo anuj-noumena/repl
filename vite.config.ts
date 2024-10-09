@@ -1,6 +1,5 @@
 import { type Plugin, mergeConfig } from 'vite'
 import dts from 'vite-plugin-dts'
-import vuetify from 'vite-plugin-vuetify'
 import base from './vite.preview.config'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -25,12 +24,12 @@ const patchCssFiles: Plugin = {
   name: 'patch-css',
   apply: 'build',
   writeBundle() {
-    // 1. MonacoEditor.css -> monaco-editor.css
+    //  inject css imports to the files
     const outDir = path.resolve('dist')
-    fs.renameSync(
-      path.resolve(outDir, 'MonacoEditor.css'),
-      path.resolve(outDir, 'monaco-editor.css'),
-    )
+    // fs.renameSync(
+    //   path.resolve(outDir, 'MonacoEditor.css'),
+    //   path.resolve(outDir, 'monaco-editor.css'),
+    // )
 
     // 2. inject css imports to the files
     ;['vue-repl', 'monaco-editor'].forEach((file) => {
@@ -42,42 +41,29 @@ const patchCssFiles: Plugin = {
 }
 
 export default mergeConfig(base, {
-  // resolve: {
-  //   alias: {
-  //     '@vue/compiler-dom': '@vue/compiler-dom/dist/compiler-dom.cjs.js',
-  //     '@vue/compiler-core': '@vue/compiler-core/dist/compiler-core.cjs.js',
-  //   },
-  // },
   plugins: [
-    vuetify({
-      styles: { configFile: 'src/settings.scss' },
+    dts({
+      rollupTypes: true,
     }),
-    // dts({
-    //   rollupTypes: true,
-    // }),
     genStub,
     patchCssFiles,
-    //cssInjectedByJsPlugin(),
   ],
   optimizeDeps: {
     // avoid late discovered deps
     include: [
       'typescript',
-      'monaco-editor-core/esm/vs/editor/editor.worker',
-    ],
-    exclude: [
-      'vuetify',
+      'monaco-editor-core/esm/vs/editor/editor.worker'
     ],
   },
   base: './',
   build: {
-    emptyOutDir: true,
+    emptyOutDir: false,
     target: 'esnext',
     minify: false,
     lib: {
       entry: {
         'vue-repl': './src/index.ts',
-        'monaco-editor': './src/editor/MonacoEditor.vue',
+        'monaco-editor': './src/editor/MonacoEditor.vue'
       },
       formats: ['es'],
       fileName: () => '[name].js',
@@ -89,14 +75,13 @@ export default mergeConfig(base, {
       },
       external: [
         'vue',
+        'vue/compiler-sfc',
         '@unimindsoftware/app-loader',
         'lodash-es',
         '@unimindsoftware/core',
         '@unimindsoftware/router',
         '@unimindsoftware/router/mock',
-        /@vue\/.*/,
-        /@unimindsoftware\/plugin-vue\/.*/,
-        /vuetify\/.*/,
+        /@unimindsoftware\/plugin-vue\/.*/
       ],
     },
   },
