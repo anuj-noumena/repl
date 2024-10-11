@@ -1,6 +1,6 @@
 {
-  "name": "@vue/repl",
-  "version": "4.4.2",
+  "name": "@unimindsoftware/repl",
+  "version": "3.0.1",
   "description": "Vue component for editing Vue components",
   "packageManager": "pnpm@9.12.1",
   "type": "module",
@@ -21,11 +21,6 @@
       "import": "./dist/monaco-editor.js",
       "require": null
     },
-    "./codemirror-editor": {
-      "types": "./dist/codemirror-editor.d.ts",
-      "import": "./dist/codemirror-editor.js",
-      "require": null
-    },
     "./package.json": "./package.json",
     "./style.css": "./dist/vue-repl.css",
     "./dist/style.css": "./dist/vue-repl.css"
@@ -43,7 +38,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --watch",
     "build-preview": "vite build -c vite.preview.config.ts",
     "format": "prettier --write .",
     "lint": "eslint .",

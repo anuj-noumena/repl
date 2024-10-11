@@ -28,6 +28,7 @@ export const tsconfigFile = 'tsconfig.json'
 
 export function useStore(
   {
+    contentId = ref('test'),
     files = ref(Object.create(null)),
     activeFilename = undefined!, // set later
     mainFile = ref('src/App.vue'),
@@ -135,6 +136,9 @@ export function useStore(
 
     // compile rest of the files
     errors.value = []
+    // compileFile(store, files.value[mainFile.value]).then((errs) =>
+    //   errors.value.push(...errs),
+    // )
     for (const [filename, file] of Object.entries(files.value)) {
       if (filename !== mainFile.value) {
         compileFile(store, file).then((errs) => errors.value.push(...errs))
@@ -342,6 +346,7 @@ export function useStore(
   applyBuiltinImportMap()
 
   const store: ReplStore = reactive({
+    contentId,
     files,
     activeFile,
     activeFilename,
@@ -399,6 +404,7 @@ export interface SFCOptions {
 }
 
 export type StoreState = ToRefs<{
+  contentId: string
   files: Record<string, File>
   activeFilename: string
   mainFile: string
@@ -445,6 +451,7 @@ export interface ReplStore extends UnwrapRef<StoreState> {
 
 export type Store = Pick<
   ReplStore,
+  | 'contentId'
   | 'files'
   | 'activeFile'
   | 'mainFile'

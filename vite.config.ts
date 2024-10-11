@@ -26,7 +26,7 @@ const patchCssFiles: Plugin = {
   writeBundle() {
     //  inject css imports to the files
     const outDir = path.resolve('dist')
-    ;['vue-repl', 'monaco-editor', 'codemirror-editor'].forEach((file) => {
+    ;['vue-repl', 'monaco-editor'].forEach((file) => {
       const filePath = path.resolve(outDir, file + '.js')
       const content = fs.readFileSync(filePath, 'utf-8')
       fs.writeFileSync(filePath, `import './${file}.css'\n${content}`)
@@ -52,13 +52,13 @@ export default mergeConfig(base, {
   },
   base: './',
   build: {
+    emptyOutDir: true,
     target: 'esnext',
     minify: false,
     lib: {
       entry: {
         'vue-repl': './src/index.ts',
         'monaco-editor': './src/editor/MonacoEditor.vue',
-        'codemirror-editor': './src/editor/CodeMirrorEditor.vue',
       },
       formats: ['es'],
       fileName: () => '[name].js',
@@ -68,7 +68,16 @@ export default mergeConfig(base, {
       output: {
         chunkFileNames: 'chunks/[name]-[hash].js',
       },
-      external: ['vue', 'vue/compiler-sfc'],
+      external: [
+        'vue',
+        /vue\/.*/,
+        /@unimindsoftware\/.*/,
+        /@babel\/.*/,
+        'lodash-es',
+        /'lodash-es'\/.*/,
+        'vuetify',
+        /vuetify\/.*/,
+      ],
     },
   },
 })

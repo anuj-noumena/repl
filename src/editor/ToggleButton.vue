@@ -5,10 +5,14 @@ const active = defineModel<boolean>()
 
 <template>
   <div class="wrapper" @click="active = !active">
-    <span>{{ text }}</span>
-    <div class="toggle" :class="[{ active: modelValue }]">
-      <div class="indicator" />
-    </div>
+    <v-switch
+      v-model="active"
+      :label="text"
+      color="primary"
+      inset
+      hide-details
+      density="compact"
+    />
   </div>
 </template>
 
