@@ -87,20 +87,23 @@ function createSandbox() {
   )
 
   const importMap = store.value.getImportMap()
-  const sandboxSrc = srcdoc
-    .replace(
-      /<html>/,
-      `<html class="${previewTheme.value ? theme.value : ''}">`,
-    )
-    .replace(/<!--IMPORT_MAP-->/, JSON.stringify(importMap))
-    .replace(
-      /<!-- PREVIEW-OPTIONS-HEAD-HTML -->/,
-      previewOptions.value?.headHTML || '',
-    )
-    .replace(
-      /<!--PREVIEW-OPTIONS-PLACEHOLDER-HTML-->/,
-      previewOptions.value?.placeholderHTML || '',
-    )
+  const sandboxSrc =
+    typeof store.value.buildSrcDoc === 'function'
+      ? store.value.buildSrcDoc(store.value, srcdoc, importMap)
+      : srcdoc
+          .replace(
+            /<html>/,
+            `<html class="${previewTheme.value ? theme.value : ''}">`,
+          )
+          .replace(/<!--IMPORT_MAP-->/, JSON.stringify(importMap))
+          .replace(
+            /<!-- PREVIEW-OPTIONS-HEAD-HTML -->/,
+            previewOptions.value?.headHTML || '',
+          )
+          .replace(
+            /<!--PREVIEW-OPTIONS-PLACEHOLDER-HTML-->/,
+            previewOptions.value?.placeholderHTML || '',
+          )
   sandbox.srcdoc = sandboxSrc
   containerRef.value?.appendChild(sandbox)
 
@@ -218,7 +221,6 @@ async function updatePreview() {
         `,
       ])
     }
-
     // compile code to simulated module system
     const modules = compileModulesForPreview(store.value)
     console.info(
@@ -227,47 +229,53 @@ async function updatePreview() {
       }.`,
     )
 
-    const codeToEval = [
-      `window.__modules__ = {};window.__css__ = [];` +
-        `if (window.__app__) window.__app__.unmount();` +
-        (isSSR
-          ? ``
-          : `document.body.innerHTML = '<div id="app"></div>' + \`${
-              previewOptions.value?.bodyHTML || ''
-            }\``),
-      ...modules,
-      `document.querySelectorAll('style[css]').forEach(el => el.remove())
-        document.head.insertAdjacentHTML('beforeend', window.__css__.map(s => \`<style css>\${s}</style>\`).join('\\n'))`,
-    ]
-
-    // if main file is a vue file, mount it.
-    if (mainFile.endsWith('.vue')) {
-      codeToEval.push(
-        `import { ${
-          isSSR ? `createSSRApp` : `createApp`
-        } as _createApp } from "vue"
-        ${previewOptions.value?.customCode?.importCode || ''}
-        const _mount = () => {
-          const AppComponent = __modules__["${mainFile}"].default
-          AppComponent.name = 'Repl'
-          const app = window.__app__ = _createApp(AppComponent)
-          if (!app.config.hasOwnProperty('unwrapInjectedRef')) {
-            app.config.unwrapInjectedRef = true
-          }
-          app.config.errorHandler = e => console.error(e)
-          ${previewOptions.value?.customCode?.useCode || ''}
-          app.mount('#app')
-        }
-        if (window.__ssr_promise__) {
-          window.__ssr_promise__.then(_mount)
-        } else {
-          _mount()
-        }`,
+    if (typeof previewOptions.value?.customCode?.evalCode === 'function') {
+      await proxy.eval(
+        previewOptions.value.customCode.evalCode(modules, store.value),
       )
-    }
+    } else {
+      // const codeToEval = [
+      //   `window.__modules__ = {};window.__css__ = [];` +
+      //     `if (window.__app__) window.__app__.unmount();` +
+      //     (isSSR
+      //       ? ``
+      //       : `document.body.innerHTML = '<div id="app"></div>' + \`${
+      //           previewOptions.value?.bodyHTML || ''
+      //         }\``),
+      //   ...modules,
+      //   `document.querySelectorAll('style[css]').forEach(el => el.remove())
+      //   document.head.insertAdjacentHTML('beforeend', window.__css__.map(s => \`<style css>\${s}</style>\`).join('\\n'))`,
+      // ]
 
-    // eval code in sandbox
-    await proxy.eval(codeToEval)
+      // // if main file is a vue file, mount it.
+      // if (mainFile.endsWith('.vue')) {
+      //   codeToEval.push(
+      //     `import { ${
+      //       isSSR ? `createSSRApp` : `createApp`
+      //     } as _createApp } from "vue"
+      //   ${previewOptions.value?.customCode?.importCode || ''}
+      //   const _mount = () => {
+      //     const AppComponent = __modules__["${mainFile}"].default
+      //     AppComponent.name = 'Repl'
+      //     const app = window.__app__ = _createApp(AppComponent)
+      //     if (!app.config.hasOwnProperty('unwrapInjectedRef')) {
+      //       app.config.unwrapInjectedRef = true
+      //     }
+      //     app.config.errorHandler = e => console.error(e)
+      //     ${previewOptions.value?.customCode?.useCode || ''}
+      //     app.mount('#app')
+      //   }
+      //   if (window.__ssr_promise__) {
+      //     window.__ssr_promise__.then(_mount)
+      //   } else {
+      //     _mount()
+      //   }`,
+      //   )
+      // }
+
+      // // eval code in sandbox
+      // await proxy.eval(codeToEval)
+    }
   } catch (e: any) {
     console.error(e)
     runtimeError.value = (e as Error).message

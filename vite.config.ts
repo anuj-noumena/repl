@@ -36,9 +36,9 @@ const patchCssFiles: Plugin = {
 
 export default mergeConfig(base, {
   plugins: [
-    dts({
-      rollupTypes: true,
-    }),
+    // dts({
+    //   rollupTypes: true,
+    // }),
     genStub,
     patchCssFiles,
   ],
@@ -52,7 +52,7 @@ export default mergeConfig(base, {
   },
   base: './',
   build: {
-    emptyOutDir: true,
+    emptyOutDir: false,
     target: 'esnext',
     minify: false,
     lib: {
@@ -71,12 +71,20 @@ export default mergeConfig(base, {
       external: [
         'vue',
         /vue\/.*/,
+        /@vue\/.*/,
+        '@unimindsoftware/plugin-vue',
         /@unimindsoftware\/.*/,
         /@babel\/.*/,
         'lodash-es',
         /'lodash-es'\/.*/,
         'vuetify',
         /vuetify\/.*/,
+        '@vue/babel-plugin-jsx',
+        'sass',
+        '@babel/standalone',
+        'crypto-hash',
+        '@babel/types',
+        '@babel/helper-module-imports',
       ],
     },
   },

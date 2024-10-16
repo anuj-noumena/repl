@@ -28,6 +28,8 @@ export const tsconfigFile = 'tsconfig.json'
 
 export function useStore(
   {
+    buildSrcDoc = undefined,
+    customCompile = shallowRef(false),
     contentId = ref('test'),
     files = ref(Object.create(null)),
     activeFilename = undefined!, // set later
@@ -89,24 +91,24 @@ export function useStore(
       { deep: true },
     )
 
-    watch(
-      vueVersion,
-      async (version) => {
-        if (version) {
-          const compilerUrl = `https://cdn.jsdelivr.net/npm/@vue/compiler-sfc@${version}/dist/compiler-sfc.esm-browser.js`
-          loading.value = true
-          compiler.value = await import(/* @vite-ignore */ compilerUrl).finally(
-            () => (loading.value = false),
-          )
-          console.info(`[@vue/repl] Now using Vue version: ${version}`)
-        } else {
-          // reset to default
-          compiler.value = defaultCompiler
-          console.info(`[@vue/repl] Now using default Vue version`)
-        }
-      },
-      { immediate: true },
-    )
+    // watch(
+    //   vueVersion,
+    //   async (version) => {
+    //     if (version) {
+    //       const compilerUrl = `https://cdn.jsdelivr.net/npm/@vue/compiler-sfc@${version}/dist/compiler-sfc.esm-browser.js`
+    //       loading.value = true
+    //       compiler.value = await import(/* @vite-ignore */ compilerUrl).finally(
+    //         () => (loading.value = false),
+    //       )
+    //       console.info(`[@vue/repl] Now using Vue version: ${version}`)
+    //     } else {
+    //       // reset to default
+    //       compiler.value = defaultCompiler
+    //       console.info(`[@vue/repl] Now using default Vue version`)
+    //     }
+    //   },
+    //   { immediate: true },
+    // )
 
     watch(
       sfcOptions,
@@ -136,14 +138,14 @@ export function useStore(
 
     // compile rest of the files
     errors.value = []
-    // compileFile(store, files.value[mainFile.value]).then((errs) =>
-    //   errors.value.push(...errs),
-    // )
-    for (const [filename, file] of Object.entries(files.value)) {
-      if (filename !== mainFile.value) {
-        compileFile(store, file).then((errs) => errors.value.push(...errs))
-      }
-    }
+    compileFile(store, files.value[mainFile.value]).then((errs) =>
+      errors.value.push(...errs),
+    )
+    // for (const [filename, file] of Object.entries(files.value)) {
+    //   if (filename !== mainFile.value) {
+    //     compileFile(store, file).then((errs) => errors.value.push(...errs))
+    //   }
+    // }
   }
 
   function setImportMap(map: ImportMap) {
@@ -335,7 +337,7 @@ export function useStore(
   if (serializedState) {
     deserialize(serializedState)
   } else {
-    setDefaultFile()
+    // setDefaultFile()
   }
   if (!files.value[mainFile.value]) {
     mainFile.value = Object.keys(files.value)[0]
@@ -346,6 +348,8 @@ export function useStore(
   applyBuiltinImportMap()
 
   const store: ReplStore = reactive({
+    customCompile,
+    buildSrcDoc,
     contentId,
     files,
     activeFile,
@@ -403,7 +407,13 @@ export interface SFCOptions {
   template?: Partial<SFCTemplateCompileOptions>
 }
 
+interface CustomCompile {
+  (store: Store): Promise<(string | Error)[]>
+}
+
 export type StoreState = ToRefs<{
+  customCompile: boolean | CustomCompile
+  buildSrcDoc?: (store: Store, srcDoc: string, importMap: ImportMap) => string
   contentId: string
   files: Record<string, File>
   activeFilename: string
@@ -451,6 +461,8 @@ export interface ReplStore extends UnwrapRef<StoreState> {
 
 export type Store = Pick<
   ReplStore,
+  | 'customCompile'
+  | 'buildSrcDoc'
   | 'contentId'
   | 'files'
   | 'activeFile'

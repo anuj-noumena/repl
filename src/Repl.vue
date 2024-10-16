@@ -25,12 +25,16 @@ export interface Props {
   layoutReverse?: boolean
   ssr?: boolean
   previewOptions?: {
+    [x: string]:
+    /// <reference types=".vue-global-types/vue_3.5_false.d.ts" />
+    any
     headHTML?: string
     bodyHTML?: string
     placeholderHTML?: string
     customCode?: {
       importCode?: string
       useCode?: string
+      evalCode?: (modules: Array<string>, store: Store) => Array<string>
     }
     showRuntimeError?: boolean
     showRuntimeWarning?: boolean

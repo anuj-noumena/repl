@@ -7,18 +7,7 @@ import type {
 import { type Transform, transform } from 'sucrase'
 import hashId from 'hash-sum'
 
-// @ts-expect-error
-import { compileSFC } from '@unimindsoftware/plugin-vue/compiler'
-
 export const COMP_IDENTIFIER = `__sfc__`
-
-export async function compileCode(code: any, fileName: any, isSFC: Boolean) {
-  return await compileSFC(fileName, code, {
-    isSFC,
-    inlineTemplate: false,
-    extraExportConfig: { disableReplaceVUEExport: true },
-  })
-}
 
 const REGEX_JS = /\.[jt]sx?$/
 function testTs(filename: string | undefined | null) {
@@ -35,48 +24,6 @@ async function transformTS(src: string, isJSX?: boolean) {
   }).code
 }
 
-const compileSFCContent = async (store: Store) => {
-  const template =
-    store.files['Template.js'].code?.trim().replace(/;+$/, '') || 'null'
-  const style = store.files['Style.css'].code
-  const setup = store.files['Setup.js'].code
-  const script = store.files['Script.js'].code
-
-  const code = `<script lang="jsx">
-/** @ts-ignore **/
-${script}
-</script>
-<script setup lang="jsx">
-/** @ts-ignore **/
-${setup}
-</script>
-<template lang="jsx">
-${template}
-</template>
-<style scoped lang="scss">
-${style || ''}
-</style>`
-  const { compiled, errors } = await compileSFC(
-    store.contentId,
-    {
-      template,
-      style,
-      setup,
-      script,
-    },
-    {
-      isSFC: true,
-      inlineTemplate: false,
-      extraExportConfig: { disableReplaceVUEExport: true },
-    },
-  )
-  if (compiled) {
-    store.files['Main.vue'].compiled.js = compiled
-    store.files['Main.vue'].code = code
-  }
-  return errors
-}
-
 export async function compileFile(
   store: Store,
   { filename, code, compiled }: File,
@@ -84,9 +31,9 @@ export async function compileFile(
   if (!code.trim()) {
     return []
   }
-  // if (store.mainFile) {
-  //   return await compileSFCContent(store)
-  // }
+  if (store.mainFile && typeof store.customCompile === 'function') {
+    return await store.customCompile(store)
+  }
 
   if (filename.endsWith('.css')) {
     compiled.css = code
