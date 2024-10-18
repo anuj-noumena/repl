@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{ text: string }>()
+const props = defineProps<{ text: string; theme?: string }>()
 const active = defineModel<boolean>()
 </script>
 
@@ -12,6 +12,7 @@ const active = defineModel<boolean>()
       inset
       hide-details
       density="compact"
+      :theme="props.theme ? props.theme : 'light'"
     />
   </div>
 </template>

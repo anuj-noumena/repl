@@ -25,8 +25,7 @@ export interface Props {
   layoutReverse?: boolean
   ssr?: boolean
   previewOptions?: {
-    [x: string]:
-    /// <reference types=".vue-global-types/vue_3.5_false.d.ts" />
+    [x: string]: /// <reference types=".vue-global-types/vue_3.5_false.d.ts" />
     any
     headHTML?: string
     bodyHTML?: string
@@ -102,7 +101,7 @@ defineExpose({ reload })
   <div class="vue-repl">
     <SplitPane :layout="layout">
       <template #[editorSlotName]>
-        <EditorContainer :editor-component="editor" />
+        <EditorContainer :editor-component="editor" :theme="props.theme" />
       </template>
       <template #[outputSlotName]>
         <Output

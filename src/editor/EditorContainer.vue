@@ -9,7 +9,8 @@ import { type EditorComponentType, injectKeyProps } from '../types'
 const SHOW_ERROR_KEY = 'repl_show_error'
 
 const props = defineProps<{
-  editorComponent: EditorComponentType
+  editorComponent: EditorComponentType,
+  theme?: 'dark' | 'light',
 }>()
 
 const { store, autoSave, editorOptions } = inject(injectKeyProps)!
@@ -48,6 +49,7 @@ watch(showMessage, () => {
         v-if="editorOptions?.showErrorText !== false"
         v-model="showMessage"
         :text="editorOptions?.showErrorText || 'Show Error'"
+        :theme="props.theme"
       />
       <ToggleButton
         v-if="editorOptions?.autoSaveText !== false"
@@ -74,7 +76,6 @@ watch(showMessage, () => {
   flex-direction: column;
   align-items: end;
   gap: 8px;
-  background-color: var(--bg);
   color: var(--text-light);
   padding: 8px;
 }

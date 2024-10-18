@@ -37,7 +37,7 @@
     "tag": "latest"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "vite build --watch --mode development",
     "build": "vite build --watch",
     "build-preview": "vite build -c vite.preview.config.ts",
     "format": "prettier --write .",
@@ -65,6 +65,9 @@
     "url": "https://github.com/vuejs/repl/issues"
   },
   "homepage": "https://github.com/vuejs/repl#readme",
+  "dependencies": {
+    "vue-hako": "^0.0.2"
+  },
   "devDependencies": {
     "@babel/standalone": "^7.25.7",
     "@babel/types": "^7.25.7",
@@ -75,11 +78,14 @@
     "@types/codemirror": "^5.60.15",
     "@types/hash-sum": "^1.0.2",
     "@types/node": "^22.7.5",
+    "@types/splitpanes": "^2.2.6",
     "@vitejs/plugin-vue": "^5.1.4",
     "@volar/jsdelivr": "~2.4.6",
     "@volar/monaco": "~2.4.6",
     "@vue/babel-plugin-jsx": "^1.2.5",
     "@vue/language-service": "~2.1.6",
+    "@vueuse/components": "^11.1.0",
+    "@vueuse/core": "^11.1.0",
     "assert": "^2.1.0",
     "bumpp": "^9.7.1",
     "codemirror": "^5.65.18",

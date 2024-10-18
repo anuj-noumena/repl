@@ -85,6 +85,7 @@ export default mergeConfig(base, {
         'crypto-hash',
         '@babel/types',
         '@babel/helper-module-imports',
+        "@vueuse/core",
       ],
     },
   },

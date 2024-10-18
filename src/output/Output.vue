@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import Preview from './Preview.vue'
-import { computed, inject, useTemplateRef } from 'vue'
+import { computed, inject, ref, useTemplateRef } from 'vue'
+
+import { Hako } from 'vue-hako'
 import {
   type EditorComponentType,
   type OutputModes,
   injectKeyProps,
 } from '../types'
+import { useFullscreen } from '@vueuse/core'
+import sizes from './screen-sizes.json'
 
 const props = defineProps<{
   editorComponent: EditorComponentType
@@ -15,6 +19,17 @@ const props = defineProps<{
 
 const { store } = inject(injectKeyProps)!
 const previewRef = useTemplateRef('preview')
+const previewContainer = useTemplateRef('previewContainer')
+const { toggle } = useFullscreen(previewContainer)
+
+const size = ref<keyof typeof sizes>('Default')
+const enabled = computed(() => size.value === 'Default')
+const width = computed(() => sizes[size.value][0])
+const height = computed(() => sizes[size.value][1])
+const sizesArray = Object.entries(sizes).map(([k, v]: [string, number[]]) => ({
+  title: k,
+  value: v,
+}))
 const modes = computed(() =>
   props.showCompileOutput
     ? (['preview', 'js', 'css', 'ssr'] as const)
@@ -41,26 +56,20 @@ defineExpose({ reload, previewRef })
 </script>
 
 <template>
-  <div class="tab-buttons">
-    <button
-      v-for="m of modes"
-      :key="m"
-      :class="{ active: mode === m }"
-      @click="mode = m"
-    >
-      <span>{{ m }}</span>
-    </button>
-  </div>
-
-  <div class="output-container">
-    <Preview ref="preview" :show="mode === 'preview'" :ssr="ssr" />
-    <props.editorComponent
-      v-if="mode !== 'preview'"
-      readonly
-      :filename="store.activeFile.filename"
-      :value="store.activeFile.compiled[mode]"
-      :mode="mode"
-    />
+  <div ref="previewContainer" class="h-100">
+    <div class="tab-buttons">
+      <button
+        v-for="m of modes"
+        :key="m"
+        :class="{ active: mode === m }"
+        @click="mode = m"
+      >
+        <span>{{ m }}</span>
+      </button>
+    </div>
+    <div class="output-container">
+      <Preview ref="preview" :show="mode === 'preview'" :ssr="ssr" />
+    </div>
   </div>
 </template>
 
